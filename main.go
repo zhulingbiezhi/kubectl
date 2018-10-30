@@ -173,6 +173,7 @@ func preRunLogs(cmd *Command) error {
 	case p := <-pod:
 		cmd.Cmd.Args = append(cmd.Cmd.Args, p.Name, "-n", p.NameSpace)
 		cmd.Cmd.Args = append(cmd.Cmd.Args, cmd.CustomerArgs...)
+		cmd.Cmd.Args = append(cmd.Cmd.Args,"--timestamps=true")
 	case <-time.After(time.Second * 15):
 		return fmt.Errorf("get pod  time out !")
 	}
