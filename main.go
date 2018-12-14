@@ -155,7 +155,7 @@ func preRunLogs(cmd *Command) error {
 		for s.Scan() {
 			line := s.Text()
 			ok, p := parsePodStatus(line, func(name string) bool {
-				if ss := strings.Split(name, "-"); len(ss) > 3 {
+				if ss := strings.Split(name, "-"); len(ss) >= 3 {
 					return strings.Contains(strings.Join(ss[:len(ss)-2],"-"), cmd.Arg)
 				}
 				return false
