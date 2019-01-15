@@ -4,22 +4,29 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 )
 
+const (
+	env_key = "kube_env"
+)
+
 func main() {
 	args := os.Args[1:]
 	var execFn = func(string, []string) {}
-	switch args[0] {
-	case "log", "logs":
+	switch true {
+	case strings.HasPrefix("logs", args[0]):
 		execFn = kubectlLogs
-	case "po", "pod", "pods":
+	case strings.HasPrefix("pods", args[0]):
 		execFn = kubctlPod
-	case "env", "e":
+	case strings.HasPrefix("env", args[0]):
 		execFn = kubectlEnv
+	case strings.HasPrefix("replace", args[0]):
+		execFn = kubectlReplace
 	}
 
 	execFn(args[1], args[2:])
@@ -65,6 +72,118 @@ func kubctlPod(arg string, customerArgs []string) {
 
 }
 
+func kubectlReplace(arg string, customerArgs []string) {
+	if os.Getenv(env_key) == "prod" {
+		log.Fatalf("the enviroment is prod  !!!")
+		return
+	}
+	if len(customerArgs) == 0 || len(customerArgs[0]) != 40 {
+		log.Fatalf("customerArgs is illegal  !!!")
+		return
+	}
+	fileName := "/Users/huhai/develop/develop-scripts/"
+	switch true {
+	case strings.HasPrefix("qfpay", arg):
+		fileName += "services/qfpay"
+	case strings.HasPrefix("adyen", arg):
+		fileName += "services/adyen"
+	case strings.HasPrefix("mpgs", arg):
+		fileName += "services/mpgs"
+	case strings.HasPrefix("alipay", arg):
+		fileName += "services/alipay"
+	case strings.HasPrefix("wechatpay", arg):
+		fileName += "services/wechatpay"
+	case strings.HasPrefix("octopus", arg):
+		fileName += "services/octopus"
+	case strings.HasPrefix("tapgo", arg):
+		fileName += "services/tapgo"
+	case strings.HasPrefix("cybersource", arg):
+		fileName += "services/cybersource"
+	case strings.HasPrefix("sdk", arg):
+		fileName += "services/payment_sdk"
+	case strings.HasPrefix("bea", arg):
+		fileName += "services/payment-services/payment-bea"
+	case strings.HasPrefix("sic", arg):
+		fileName += "services/payment-services/payment-sic"
+	case strings.HasPrefix("wlb", arg):
+		fileName += "services/payment-services/payment-WLB"
+	case strings.HasPrefix("gateway", arg):
+		fileName += "gateway"
+	default:
+		fmt.Errorf("wrong replace name")
+		return
+	}
+	fileName += "/deployment.yaml"
+	//read lines
+	lines, err := readLineFromFile(fileName, customerArgs[0])
+	if err != nil {
+		log.Fatalf("readLineFromFile error : %s", err.Error())
+		return
+	}
+	//write lines
+	if err := writeLineToFile(fileName, lines); err != nil {
+		log.Fatalf("writeLineToFile error : %s", err.Error())
+		return
+	}
+	var s string
+	for s == "" {
+		fmt.Scanf("%s\n", &s)
+	}
+
+	cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf("kubectl replace -f %s", fileName))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		//log.Fatalf("exec.Command error : %s", err.Error())
+		return
+	}
+	fmt.Println("replace success !")
+}
+
+func readLineFromFile(fileName, dstStr string) ([]string, error) {
+	var lines []string
+	file, err := os.OpenFile(fileName, os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed opening file: %s", err)
+
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		txt := scanner.Text()
+		if strings.Contains(txt, "image:") && strings.Contains(txt, "bindo-staging-tw") {
+			ss := strings.Split(txt, ":")
+			if len(ss) == 3 {
+				ss[2] = dstStr
+			}
+			txt = strings.Join(ss, ":")
+			fmt.Println("-----------")
+			fmt.Println(txt)
+			fmt.Println("-----------")
+		}
+		lines = append(lines, txt)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanner error: %s", err.Error())
+	}
+	return lines, nil
+}
+
+func writeLineToFile(fileName string, lines []string) error {
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed opening file: %s", err)
+
+	}
+	defer file.Close()
+	w := bufio.NewWriter(file)
+	for _, line := range lines {
+		fmt.Fprintln(w, line)
+	}
+	return w.Flush()
+}
+
 func kubectlEnv(arg string, customerArgs []string) {
 	script := ""
 	switch arg {
@@ -78,6 +197,8 @@ func kubectlEnv(arg string, customerArgs []string) {
 	cmd.Stdout = os.Stdout
 	if err := cmd.Run(); err != nil {
 		fmt.Println("kubectlEnv error: ", err.Error())
+	} else {
+		os.Setenv(env_key, "prod")
 	}
 }
 
@@ -156,7 +277,7 @@ func preRunLogs(cmd *Command) error {
 			line := s.Text()
 			ok, p := parsePodStatus(line, func(name string) bool {
 				if ss := strings.Split(name, "-"); len(ss) >= 3 {
-					return strings.Contains(strings.Join(ss[:len(ss)-2],"-"), cmd.Arg)
+					return strings.Contains(strings.Join(ss[:len(ss)-2], "-"), cmd.Arg)
 				}
 				return false
 			})
@@ -173,7 +294,7 @@ func preRunLogs(cmd *Command) error {
 	case p := <-pod:
 		cmd.Cmd.Args = append(cmd.Cmd.Args, p.Name, "-n", p.NameSpace)
 		cmd.Cmd.Args = append(cmd.Cmd.Args, cmd.CustomerArgs...)
-		cmd.Cmd.Args = append(cmd.Cmd.Args,"--timestamps=true")
+		cmd.Cmd.Args = append(cmd.Cmd.Args, "--timestamps=true")
 	case <-time.After(time.Second * 15):
 		return fmt.Errorf("get pod  time out !")
 	}
