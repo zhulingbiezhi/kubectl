@@ -103,6 +103,8 @@ func kubectlReplace(arg string, customerArgs []string) {
 		fileName += "services/payment_sdk"
 	case strings.HasPrefix("bea", arg):
 		fileName += "services/payment-services/payment-bea"
+	case strings.HasPrefix("beacup", arg):
+		fileName += "services/payment-services/payment-bea-cup"
 	case strings.HasPrefix("sic", arg):
 		fileName += "services/payment-services/payment-sic"
 	case strings.HasPrefix("wlb", arg):
