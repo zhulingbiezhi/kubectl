@@ -12,8 +12,40 @@ import (
 )
 
 const (
-	env_key = "kube_env"
+	env_key          = "kube_env"
+	qfpay_path       = "services/qfpay"
+	adyen_path       = "services/adyen"
+	mpgs_path        = "services/mpgs"
+	alipay_path      = "services/alipay"
+	etone_path       = "services/etonepay"
+	allinpay_path    = "services/allinpay"
+	wechatpay_path   = "services/wechatpay"
+	octopus_path     = "services/octopus"
+	tapgo_path       = "services/tapgo"
+	cybersource_path = "services/cybersource"
+	sdk_path         = "services/payment_sdk"
+	bea_path         = "services/payment-services/payment-bea"
+	beacup_path      = "services/payment-services/payment-bea-cup"
+	sic_path         = "services/payment-services/payment-sic"
+	wlb_path         = "services/payment-services/payment-WLB"
+	fake_path        = "services/payment-services/payment-fake"
+	gateway_path     = "gateway"
 )
+
+var all_path = []string{
+	qfpay_path,
+	adyen_path,
+	mpgs_path,
+	alipay_path,
+	etone_path,
+	allinpay_path,
+	wechatpay_path,
+	octopus_path,
+	tapgo_path,
+	cybersource_path,
+	sdk_path,
+	gateway_path,
+}
 
 func main() {
 	args := os.Args[1:]
@@ -84,62 +116,80 @@ func kubectlReplace(arg string, customerArgs []string) {
 	fileName := "/Users/huhai/develop/develop-scripts/"
 	switch true {
 	case strings.HasPrefix("qfpay", arg):
-		fileName += "services/qfpay"
+		fileName += qfpay_path
 	case strings.HasPrefix("adyen", arg):
-		fileName += "services/adyen"
+		fileName += adyen_path
 	case strings.HasPrefix("mpgs", arg):
-		fileName += "services/mpgs"
+		fileName += mpgs_path
 	case strings.HasPrefix("alipay", arg):
-		fileName += "services/alipay"
+		fileName += alipay_path
+	case strings.HasPrefix("etone", arg):
+		fileName += etone_path
+	case strings.HasPrefix("allinpay", arg):
+		fileName += allinpay_path
 	case strings.HasPrefix("wechatpay", arg):
-		fileName += "services/wechatpay"
+		fileName += wechatpay_path
 	case strings.HasPrefix("octopus", arg):
-		fileName += "services/octopus"
+		fileName += octopus_path
 	case strings.HasPrefix("tapgo", arg):
-		fileName += "services/tapgo"
+		fileName += tapgo_path
 	case strings.HasPrefix("cybersource", arg):
-		fileName += "services/cybersource"
+		fileName += cybersource_path
 	case strings.HasPrefix("sdk", arg):
-		fileName += "services/payment_sdk"
+		fileName += sdk_path
 	case strings.HasPrefix("bea", arg):
-		fileName += "services/payment-services/payment-bea"
+		fileName += bea_path
 	case strings.HasPrefix("beacup", arg):
-		fileName += "services/payment-services/payment-bea-cup"
+		fileName += beacup_path
 	case strings.HasPrefix("sic", arg):
-		fileName += "services/payment-services/payment-sic"
+		fileName += sic_path
 	case strings.HasPrefix("wlb", arg):
-		fileName += "services/payment-services/payment-WLB"
+		fileName += wlb_path
+	case strings.HasPrefix("fake", arg):
+		fileName += fake_path
 	case strings.HasPrefix("gateway", arg):
-		fileName += "gateway"
+		fileName += gateway_path
+	case strings.HasPrefix("_all", arg):
+		replaceByFileName(customerArgs[0], all_path...)
+		return
 	default:
-		fmt.Errorf("wrong replace name")
+		log.Fatalf("wrong replace name")
 		return
 	}
-	fileName += "/deployment.yaml"
-	//read lines
-	lines, err := readLineFromFile(fileName, customerArgs[0])
-	if err != nil {
-		log.Fatalf("readLineFromFile error : %s", err.Error())
-		return
-	}
-	//write lines
-	if err := writeLineToFile(fileName, lines); err != nil {
-		log.Fatalf("writeLineToFile error : %s", err.Error())
-		return
-	}
-	var s string
-	for s == "" {
-		fmt.Scanf("%s\n", &s)
-	}
+	replaceByFileName(customerArgs[0], fileName)
+}
 
-	cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf("kubectl replace -f %s", fileName))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		//log.Fatalf("exec.Command error : %s", err.Error())
-		return
+func replaceByFileName(arg string, names ...string) {
+	for _, name := range names {
+		name += "/deployment.yaml"
+		//read lines
+		lines, err := readLineFromFile(name, arg)
+		if err != nil {
+			log.Fatalf("readLineFromFile error : %s", err.Error())
+			return
+		}
+		//write lines
+		if err := writeLineToFile(name, lines); err != nil {
+			log.Fatalf("writeLineToFile error : %s", err.Error())
+			return
+		}
+		var s string
+		for s == "" {
+			fmt.Scanf("%s\n", &s)
+		}
+		if s == "quit" {
+			continue
+		}
+
+		cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf("kubectl replace -f %s", name))
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			//log.Fatalf("exec.Command error : %s", err.Error())
+			return
+		}
+		fmt.Println("replace success !")
 	}
-	fmt.Println("replace success !")
 }
 
 func readLineFromFile(fileName, dstStr string) ([]string, error) {
@@ -154,6 +204,7 @@ func readLineFromFile(fileName, dstStr string) ([]string, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		txt := scanner.Text()
+		oriText := txt
 		if strings.Contains(txt, "image:") && strings.Contains(txt, "bindo-staging-tw") {
 			ss := strings.Split(txt, ":")
 			if len(ss) == 3 {
@@ -161,6 +212,7 @@ func readLineFromFile(fileName, dstStr string) ([]string, error) {
 			}
 			txt = strings.Join(ss, ":")
 			fmt.Println("-----------")
+			fmt.Printf("%s\n", oriText)
 			fmt.Println(txt)
 			fmt.Println("-----------")
 		}
