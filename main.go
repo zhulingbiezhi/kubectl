@@ -24,6 +24,7 @@ const (
 	tapgo_path       = "services/tapgo"
 	cybersource_path = "services/cybersource"
 	sdk_path         = "services/payment_sdk"
+	xunlian_path     = "services/xunlian"
 	bea_path         = "services/payment-services/payment-bea"
 	beacup_path      = "services/payment-services/payment-bea-cup"
 	sic_path         = "services/payment-services/payment-sic"
@@ -113,7 +114,7 @@ func kubectlReplace(arg string, customerArgs []string) {
 		log.Fatalf("customerArgs is illegal  !!!")
 		return
 	}
-	fileName := "/Users/huhai/develop/develop-scripts/"
+	var fileName string
 	switch true {
 	case strings.HasPrefix("qfpay", arg):
 		fileName += qfpay_path
@@ -133,6 +134,8 @@ func kubectlReplace(arg string, customerArgs []string) {
 		fileName += octopus_path
 	case strings.HasPrefix("tapgo", arg):
 		fileName += tapgo_path
+	case strings.HasPrefix("xunlian", arg):
+		fileName += xunlian_path
 	case strings.HasPrefix("cybersource", arg):
 		fileName += cybersource_path
 	case strings.HasPrefix("sdk", arg):
@@ -161,7 +164,7 @@ func kubectlReplace(arg string, customerArgs []string) {
 
 func replaceByFileName(arg string, names ...string) {
 	for _, name := range names {
-		name += "/deployment.yaml"
+		name = "/Users/huhai/develop/develop-scripts/" + name + "/deployment.yaml"
 		//read lines
 		lines, err := readLineFromFile(name, arg)
 		if err != nil {
